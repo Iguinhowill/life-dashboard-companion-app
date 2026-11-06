@@ -22,6 +22,16 @@ destino="${1:-$HOME/hub-saude-assinatura.p12}"
 command -v openssl >/dev/null || { echo "Não achei o openssl. Rode no Git Bash."; exit 1; }
 gh auth status >/dev/null 2>&1 || { echo "O gh não está logado. Rode: gh auth login"; exit 1; }
 
+# Secrets de assinatura no nível do repositório valeriam para qualquer workflow, inclusive o
+# release.yml do original. Aqui eles só podem existir no environment.
+antigos="$(gh secret list --repo "$repo" --json name --jq '.[].name' | grep -E '^(KEYSTORE_|KEY_)' || true)"
+if [ -n "$antigos" ]; then
+  echo "Há secrets de assinatura no nível do repositório: $(echo $antigos)."
+  echo "Eles valem para qualquer workflow, inclusive o release.yml do original. Apague antes de seguir:"
+  for s in $antigos; do echo "  gh secret delete $s --repo $repo"; done
+  exit 1
+fi
+
 tmp="$(mktemp -d)"
 criou_chave=false
 concluiu=false
@@ -87,13 +97,18 @@ fi
 # "assinatura", então não lê a chave. O passo só reforça isso quando ele já existe.
 estado_release() {
   local estado
-  if estado="$(gh api "repos/$repo/actions/workflows/release.yml" --jq .state 2>/dev/null)"; then
+  if estado="$(gh api "repos/$repo/actions/workflows/release.yml" --jq .state 2>"$tmp/erro-api.txt")"; then
     echo "$estado"
-  else
+  elif grep -q "HTTP 404" "$tmp/erro-api.txt"; then
     echo "nunca rodou no fork (não registrado)"
+  else
+    # Rede, escopo do token, limite da API: mostra o erro em vez de fingir que está tudo bem.
+    cat "$tmp/erro-api.txt" >&2
+    return 1
   fi
 }
-if [ "$(estado_release)" = "active" ]; then
+estado="$(estado_release)"
+if [ "$estado" = "active" ]; then
   echo "Desligando o release.yml do original..."
   gh api -X PUT "repos/$repo/actions/workflows/release.yml/disable"
 fi
@@ -109,7 +124,7 @@ echo
 echo "Secrets do environment $ambiente:"
 gh secret list --env "$ambiente" --repo "$repo"
 echo "Branches liberadas: $(gh api "repos/$repo/environments/$ambiente/deployment-branch-policies" --jq '[.branch_policies[].name] | join(", ")')"
-echo "release.yml: $(estado_release)"
+echo "release.yml: $(estado_release || echo "não consegui consultar")"
 echo
 echo "Pronto. A chave fica em $destino."
 echo "Guarde uma cópia desse arquivo junto da senha. Sem ele, o celular não aceita atualizações:"

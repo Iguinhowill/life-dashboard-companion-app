@@ -46,9 +46,9 @@ A chave fica longe do código que ainda não foi revisado:
    bash hub/criar-chave.sh
    ```
    Ele pede uma senha e cria `~/hub-saude-assinatura.p12`. Depois cria o environment `assinatura` restrito à `main`, desliga o `release.yml` do original se o GitHub já o tiver registrado e grava 3 secrets no environment. Guarde o arquivo e a senha no gerenciador de senhas. Sem eles, o celular não aceita atualizações e é preciso desinstalar e configurar de novo. Pode rodar de novo: ele reaproveita a chave e confere o que já está feito.
-2. **Gerar o APK assinado:** depois dos secrets, rode o workflow *Hub APK* na `main` pela aba Actions (*Run workflow*) ou faça um push na `main`. O APK sai na pré-release [hub-latest](https://github.com/Iguinhowill/life-dashboard-companion-app/releases/tag/hub-latest), junto com o `mapping-hub.txt` do R8, que serve para ler um stack trace de crash.
+2. **Gerar o APK assinado:** depois dos secrets, rode o workflow *Hub APK* na `main` pela aba Actions (*Run workflow*) ou faça um push na `main`. Cada build vira uma release `hub-N`, marcada como a mais recente, com o APK e o `mapping-hub.txt` do R8, que serve para ler um stack trace de crash. Ficam as 5 últimas.
 3. **No celular:**
-   1. Abra a página da hub-latest, baixe `hub-saude.apk` e instale.
+   1. Baixe pelo link fixo [releases/latest/download/hub-saude.apk](https://github.com/Iguinhowill/life-dashboard-companion-app/releases/latest/download/hub-saude.apk), que sempre aponta para o último build, e instale.
    2. Nos Galaxy com o Bloqueador automático ligado (*Configurações › Segurança e privacidade*), desligue-o durante a instalação e religue depois.
    3. Confira se o SHA-256 das notas da release bate, se quiser.
 4. **Configuração:** siga `docs/saude.md` do hub (endereço do webhook, segredo HMAC e agenda).
@@ -71,7 +71,7 @@ gh pr create --repo Iguinhowill/life-dashboard-companion-app --base main
 Na PR:
 1. Leia o diff do original, começando por `.github/workflows`. Workflow novo ou alterado roda na própria PR. Ele não enxerga a chave, mas pode pedir permissão de escrita no repositório.
 2. Espere o *Hub APK* passar. Se ele acusar permissão nova, decida entre removê-la em `app/src/hub/AndroidManifest.xml` e aceitá-la em `hub/permissoes.txt`.
-3. Depois do merge, a hub-latest é refeita, e você instala por cima no celular.
+3. Depois do merge, sai uma release nova; baixe pelo mesmo link e instale por cima no celular.
 
 No clone local, o remote `upstream` é só de leitura, para nada ir parar no repositório do autor por engano. Num clone novo, repita:
 

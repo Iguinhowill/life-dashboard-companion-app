@@ -1,7 +1,8 @@
 name: Hub APK
 
 # Fork Iguinhowill: compila a variante hub (só sono, passos e FC em repouso, hub/README.md),
-# confere as permissões e, na main, assina e publica o APK na pré-release hub-latest.
+# confere as permissões e, na main, assina e publica o APK numa release (a mais recente vira
+# releases/latest).
 #
 # A chave nunca encosta no Gradle. O job "apk" roda o build do original, que numa PR de
 # sincronização ainda não foi revisado, sem secret nenhum e com o token só de leitura. Só o job
@@ -91,7 +92,7 @@ jobs:
     runs-on: ubuntu-latest
     environment: assinatura
     permissions:
-      contents: write # atualizar a pré-release hub-latest
+      contents: write # criar a release
 
     steps:
       # Só os scripts de hub/, da main já revisada.
@@ -123,7 +124,14 @@ jobs:
           fi
           bt="$(ls -d "$ANDROID_HOME"/build-tools/*/ | sort -V | tail -1)"
           printf '%s' "$KEYSTORE_FILE_BASE64" | base64 --decode > "$RUNNER_TEMP/chave.p12"
-          "${bt}zipalign" -p -f 4 artefato/apk/hub/app-hub-unsigned.apk "$RUNNER_TEMP/alinhado.apk"
+          # O AGP já entrega o APK alinhado, com as .so em páginas de 16 KB. Só realinha se não
+          # estiver, e com -P 16, para não rebaixar para 4 KB.
+          sem_assinatura=artefato/apk/hub/app-hub-unsigned.apk
+          if "${bt}zipalign" -c -P 16 4 "$sem_assinatura" > /dev/null; then
+            cp "$sem_assinatura" "$RUNNER_TEMP/alinhado.apk"
+          else
+            "${bt}zipalign" -P 16 -f 4 "$sem_assinatura" "$RUNNER_TEMP/alinhado.apk"
+          fi
           "${bt}apksigner" sign \
             --ks "$RUNNER_TEMP/chave.p12" --ks-type PKCS12 --ks-key-alias "$KEY_ALIAS" \
             --ks-pass env:KEYSTORE_PASSWORD --key-pass env:KEYSTORE_PASSWORD \
@@ -137,7 +145,11 @@ jobs:
       - name: Check permissions of the signed APK
         run: bash hub/conferir-permissoes.sh hub-saude.apk
 
-      - name: Publish hub-latest
+      # Uma release nova por build, marcada como a mais recente, em vez de mover uma tag: o link
+      # fixo releases/latest/download/hub-saude.apk passa de uma para a outra de uma vez, sem
+      # janela sem APK, e cada versão guarda o próprio mapping. Tags hub-N não casam com o
+      # padrão X.Y.Z do release.yml. Ficam as 5 últimas.
+      - name: Publish release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -145,14 +157,13 @@ jobs:
           versao="$("${bt}aapt2" dump badging hub-saude.apk | sed -n "s/.*versionName='\([^']*\)'.*/\1/p" | head -1)"
           sha="$(sha256sum hub-saude.apk | cut -d' ' -f1)"
           cp artefato/mapping/hub/mapping.txt mapping-hub.txt
-          titulo="Hub Saúde $versao"
+          tag="hub-$GITHUB_RUN_NUMBER.$GITHUB_RUN_ATTEMPT"
           notas="APK da variante hub, compilado do commit $GITHUB_SHA. SHA-256: \`$sha\`. Instalação e atualização em hub/README.md."
-          if gh release view hub-latest --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
-            # Atualiza no lugar, sem apagar a release: o link do celular nunca fica quebrado.
-            gh api -X PATCH "repos/$GITHUB_REPOSITORY/git/refs/tags/hub-latest" -f sha="$GITHUB_SHA" -F force=true > /dev/null
-            gh release upload hub-latest hub-saude.apk mapping-hub.txt --clobber --repo "$GITHUB_REPOSITORY"
-            gh release edit hub-latest --title "$titulo" --notes "$notas" --repo "$GITHUB_REPOSITORY"
-          else
-            gh release create hub-latest hub-saude.apk mapping-hub.txt --prerelease \
-              --target "$GITHUB_SHA" --title "$titulo" --notes "$notas" --repo "$GITHUB_REPOSITORY"
-          fi
+          gh release create "$tag" hub-saude.apk mapping-hub.txt --latest \
+            --target "$GITHUB_SHA" --title "Hub Saúde $versao ($tag)" --notes "$notas" \
+            --repo "$GITHUB_REPOSITORY"
+          gh release list --repo "$GITHUB_REPOSITORY" --limit 100 --json tagName,createdAt \
+            --jq '[.[] | select(.tagName | startswith("hub-"))] | sort_by(.createdAt) | reverse | .[5:] | .[].tagName' \
+            | while read -r antiga; do
+                gh release delete "$antiga" --cleanup-tag --yes --repo "$GITHUB_REPOSITORY"
+              done
