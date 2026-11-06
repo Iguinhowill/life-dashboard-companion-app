@@ -65,7 +65,10 @@
         <!--
             A MainActivity sem os links de pareamento (https://owen282000.github.io/... e
             lifedashboard://pair): um link aberto de qualquer página poderia propor um destino
-            novo para os dados. Aqui o destino é só o webhook do hub, cadastrado à mão.
+            novo para os dados. Não fecha tudo: ela continua exportada (é a do ícone), então um
+            app instalado no celular ainda pode mandar um intent explícito de pareamento. Nesse
+            caso o app mostra o diálogo de pareamento e nada muda sem você confirmar; recuse
+            qualquer pareamento, porque o destino do hub é cadastrado à mão.
             "replace" troca o elemento inteiro: se o original mudar os atributos dela, copie aqui.
         -->
         <activity
