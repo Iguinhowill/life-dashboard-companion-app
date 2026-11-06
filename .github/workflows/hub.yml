@@ -1,0 +1,117 @@
+name: Hub APK
+
+# Fork Iguinhowill: compila a variante hub (só sono, passos e FC em repouso, hub/README.md),
+# confere as permissões do APK e, num push na main, publica o APK assinado na pré-release
+# hub-latest. A tag hub-latest não casa com o padrão X.Y.Z do release.yml, que fica parado aqui.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  hub:
+    if: github.repository == 'Iguinhowill/life-dashboard-companion-app'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # publicar a pré-release hub-latest
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Check signing secrets
+        id: chave
+        env:
+          KEYSTORE_FILE_BASE64: ${{ secrets.KEYSTORE_FILE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          if [ -n "$KEYSTORE_FILE_BASE64" ] && [ -n "$KEYSTORE_PASSWORD" ] && [ -n "$KEY_ALIAS" ] && [ -n "$KEY_PASSWORD" ]; then
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::Sem os secrets de assinatura (rode hub/criar-chave.sh): o APK sai sem assinatura e não instala."
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Set up JDK
+        uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: gradle
+      # Mesmo ajuste do build.yml: com os 2 GB do gradle.properties o D8 fica sem memória.
+      - name: Give the Gradle daemon more heap
+        run: |
+          mkdir -p ~/.gradle
+          echo "org.gradle.jvmargs=-Xmx4g -XX:MaxMetaspaceSize=1g -Dfile.encoding=UTF-8" >> ~/.gradle/gradle.properties
+
+      - name: Decode keystore
+        if: steps.chave.outputs.ok == 'true'
+        env:
+          KEYSTORE_FILE_BASE64: ${{ secrets.KEYSTORE_FILE_BASE64 }}
+        run: printf '%s' "$KEYSTORE_FILE_BASE64" | base64 --decode > "$RUNNER_TEMP/keystore.jks"
+
+      # O build.gradle.kts assina quando KEYSTORE_PATH existe, mesmo vazio: por isso as
+      # variáveis só são exportadas quando a chave está lá.
+      - name: Build hub APK
+        env:
+          ASSINAR: ${{ steps.chave.outputs.ok }}
+          S_KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          S_KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          S_KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          chmod +x gradlew
+          if [ "$ASSINAR" = "true" ]; then
+            export KEYSTORE_PATH="$RUNNER_TEMP/keystore.jks"
+            export KEYSTORE_PASSWORD="$S_KEYSTORE_PASSWORD" KEY_ALIAS="$S_KEY_ALIAS" KEY_PASSWORD="$S_KEY_PASSWORD"
+          fi
+          ./gradlew assembleHub
+
+      - name: Clean up keystore
+        if: always()
+        run: rm -f "$RUNNER_TEMP/keystore.jks"
+
+      - name: Find the APK
+        id: apk
+        run: |
+          apk="$(ls app/build/outputs/apk/hub/*.apk | head -1)"
+          echo "path=$apk" >> "$GITHUB_OUTPUT"
+          echo "$(sha256sum "$apk")"
+
+      - name: Check permissions
+        run: bash hub/conferir-permissoes.sh "${{ steps.apk.outputs.path }}"
+
+      - name: Upload APK as artifact
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: hub-apk
+          path: ${{ steps.apk.outputs.path }}
+          retention-days: 30
+
+      - name: Publish hub-latest
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.chave.outputs.ok == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          APK: ${{ steps.apk.outputs.path }}
+        run: |
+          cp "$APK" hub-saude.apk
+          aapt2="$(ls -d "$ANDROID_HOME"/build-tools/*/ | sort -V | tail -1)aapt2"
+          versao="$("$aapt2" dump badging hub-saude.apk | sed -n "s/.*versionName='\([^']*\)'.*/\1/p" | head -1)"
+          sha="$(sha256sum hub-saude.apk | cut -d' ' -f1)"
+          gh release delete hub-latest --cleanup-tag --yes || true
+          gh release create hub-latest hub-saude.apk \
+            --prerelease \
+            --target "$GITHUB_SHA" \
+            --title "Hub Saúde $versao" \
+            --notes "APK da variante hub, compilado do commit $GITHUB_SHA. SHA-256: \`$sha\`. Instalação e atualização em hub/README.md."

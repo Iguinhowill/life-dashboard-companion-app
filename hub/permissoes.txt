@@ -1,0 +1,23 @@
+# Todas as permissões que o APK da variante hub pode pedir, uma por linha.
+# hub/conferir-permissoes.sh falha o build se o APK pedir qualquer outra.
+# APP. é o pacote do próprio app (com.owen282000.lifedashboard.hub).
+
+# Health Connect: só o que o hub usa.
+android.permission.health.READ_SLEEP
+android.permission.health.READ_STEPS
+android.permission.health.READ_RESTING_HEART_RATE
+# Ler com o app fechado (envios agendados) e além dos 30 dias antes da primeira autorização.
+android.permission.health.READ_HEALTH_DATA_IN_BACKGROUND
+android.permission.health.READ_HEALTH_DATA_HISTORY
+
+# Do próprio app.
+android.permission.INTERNET
+android.permission.POST_NOTIFICATIONS
+android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS
+
+# Das bibliotecas AndroidX (WorkManager agenda os envios e volta depois de reiniciar o celular).
+android.permission.ACCESS_NETWORK_STATE
+android.permission.WAKE_LOCK
+android.permission.RECEIVE_BOOT_COMPLETED
+android.permission.FOREGROUND_SERVICE
+APP.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION
