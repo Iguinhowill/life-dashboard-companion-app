@@ -163,6 +163,14 @@ android {
             initWith(getByName("release"))
             proguardFile("proguard-play.pro")
         }
+        // Fork Iguinhowill: o release com só sono, passos e FC em repouso (src/hub, hub/README.md).
+        // Outro application id, para não se misturar com o app original no celular. Build it with
+        // ./gradlew assembleHub.
+        create("hub") {
+            initWith(getByName("release"))
+            applicationIdSuffix = ".hub"
+            versionNameSuffix = "-hub"
+        }
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
