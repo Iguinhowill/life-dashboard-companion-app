@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Variante "hub" (fork Iguinhowill): o app original com só o que o hub pessoal usa.
+
+    Este manifesto entra por cima do src/main e tira permissões. O Android garante o resto: sem
+    a permissão no manifesto, o app não consegue nem pedir o dado, venha o código que vier do
+    original. O script hub/conferir-permissoes.sh compara o APK pronto com hub/permissoes.txt e
+    falha o build se aparecer qualquer permissão nova, inclusive uma que o original acrescente.
+
+    Ficam: sono, passos, FC em repouso, leitura em segundo plano e histórico (até 30 dias antes
+    da primeira autorização sem ela), internet, notificações e o pedido de sair da economia de
+    bateria.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- Health Connect: os outros tipos de leitura e toda a gravação (o "Receive" do Home Assistant). -->
+    <uses-permission android:name="android.permission.health.READ_HEART_RATE" tools:node="remove" />
+    <uses-permission android:name="android.permission.health.READ_SPEED" tools:node="remove" />
+    <uses-permission android:name="android.permission.health.READ_DISTANCE" tools:node="remove" />
+    <uses-permission android:name="android.permission.health.READ_ACTIVE_CALORIES_BURNED" tools:node="remove" />
+    <uses-permission android:name="android.permission.health.READ_TOTAL_CALORIES_BURNED" tools:node="remove" />
+    <uses-permission android:name="android.permission.health.READ_WEIGHT" tools:node="remove" />
+    <uses-permission android:name="android.permission.health.READ_HEIGHT" tools:node="remove" />
+    <uses-permission android:name="android.permission.health.READ_BLOOD_PRESSURE" tools:node="remove" />
+    <uses-permission android:name="android.permission.health.READ_BLOOD_GLUCOSE" tools:node="remove" />
+    <uses-permission android:name="android.permission.health.READ_OXYGEN_SATURATION" tools:node="remove" />
+    <uses-permission android:name="android.permission.health.READ_BODY_TEMPERATURE" tools:node="remove" />
+    <uses-permission android:name="android.permission.health.READ_RESPIRATORY_RATE" tools:node="remove" />
+    <uses-permission android:name="android.permission.health.READ_EXERCISE" tools:node="remove" />
+    <uses-permission android:name="android.permission.health.READ_HYDRATION" tools:node="remove" />
+    <uses-permission android:name="android.permission.health.READ_NUTRITION" tools:node="remove" />
+    <uses-permission android:name="android.permission.health.READ_MINDFULNESS" tools:node="remove" />
+    <uses-permission android:name="android.permission.health.READ_BODY_FAT" tools:node="remove" />
+    <uses-permission android:name="android.permission.health.READ_LEAN_BODY_MASS" tools:node="remove" />
+    <uses-permission android:name="android.permission.health.READ_BONE_MASS" tools:node="remove" />
+    <uses-permission android:name="android.permission.health.READ_BODY_WATER_MASS" tools:node="remove" />
+    <uses-permission android:name="android.permission.health.READ_HEART_RATE_VARIABILITY" tools:node="remove" />
+    <uses-permission android:name="android.permission.health.READ_MENSTRUATION" tools:node="remove" />
+    <uses-permission android:name="android.permission.health.READ_BASAL_METABOLIC_RATE" tools:node="remove" />
+    <uses-permission android:name="android.permission.health.READ_VO2_MAX" tools:node="remove" />
+    <uses-permission android:name="android.permission.health.READ_SKIN_TEMPERATURE" tools:node="remove" />
+    <uses-permission android:name="android.permission.health.READ_BASAL_BODY_TEMPERATURE" tools:node="remove" />
+    <uses-permission android:name="android.permission.health.READ_INTERMENSTRUAL_BLEEDING" tools:node="remove" />
+    <uses-permission android:name="android.permission.health.READ_OVULATION_TEST" tools:node="remove" />
+    <uses-permission android:name="android.permission.health.READ_CERVICAL_MUCUS" tools:node="remove" />
+    <uses-permission android:name="android.permission.health.READ_SEXUAL_ACTIVITY" tools:node="remove" />
+    <uses-permission android:name="android.permission.health.WRITE_WEIGHT" tools:node="remove" />
+    <uses-permission android:name="android.permission.health.WRITE_HEIGHT" tools:node="remove" />
+    <uses-permission android:name="android.permission.health.WRITE_BODY_FAT" tools:node="remove" />
+    <uses-permission android:name="android.permission.health.WRITE_LEAN_BODY_MASS" tools:node="remove" />
+    <uses-permission android:name="android.permission.health.WRITE_BONE_MASS" tools:node="remove" />
+    <uses-permission android:name="android.permission.health.WRITE_BODY_WATER_MASS" tools:node="remove" />
+    <uses-permission android:name="android.permission.health.WRITE_BLOOD_PRESSURE" tools:node="remove" />
+
+    <!-- Tempo de tela e câmera (a câmera só serve para ler o QR de pareamento do Home Assistant). -->
+    <uses-permission
+        android:name="android.permission.PACKAGE_USAGE_STATS"
+        tools:node="remove" />
+    <uses-permission
+        android:name="android.permission.CAMERA"
+        tools:node="remove" />
+
+    <application>
+        <!--
+            A MainActivity sem os links de pareamento (https://owen282000.github.io/... e
+            lifedashboard://pair): um link aberto de qualquer página poderia propor um destino
+            novo para os dados. Não fecha tudo: ela continua exportada (é a do ícone), então um
+            app instalado no celular ainda pode mandar um intent explícito de pareamento. Nesse
+            caso o app mostra o diálogo de pareamento e nada muda sem você confirmar; recuse
+            qualquer pareamento, porque o destino do hub é cadastrado à mão.
+            "replace" troca o elemento inteiro: se o original mudar os atributos dela, copie aqui.
+        -->
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:launchMode="singleTop"
+            android:windowSoftInputMode="adjustResize"
+            tools:node="replace">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>
